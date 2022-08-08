@@ -13,4 +13,5 @@ typedef struct{
 
   // stack pointer
   unsigned short sp;
+
 } CPU;
