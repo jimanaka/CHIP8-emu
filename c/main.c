@@ -152,11 +152,78 @@ int emulate(CPU* cpu, unsigned char* memory, unsigned short* stack, unsigned cha
                   cpu->pc += 2;
                   break;
 
+                case 0x0002:
+                  // 0x8xy2
+                  // Vx = Vx AND Vy
+                  cpu->V[(opcode & 0x0F00) >> 8] &= cpu->V[(opcode & 0x00F0) >> 4];
+                  cpu->pc += 2;
+                  break;
+
+                case 0x0003:
+                  // 0x8xy3
+                  // Vx = Vx XOR Vy
+                  cpu->V[(opcode & 0x0F00) >> 8] ^= cpu->V[(opcode & 0x00F0) >> 4];
+                  cpu->pc += 2;
+                  break;
+
+                case 0x0004:
+                  // 0x8xy4
+                  // Vx = Vx + Vy, set VF = carry
+                  if(cpu->V[(opcode & 0x00F0) >> 4] > (0xFF - cpu->V[(opcode & 0x0F00) >> 8])) cpu->V[0xF] = 1; //carry
+                  else cpu->V[0xF] = 0;
+                  cpu->V[(opcode & 0x0F00) >> 8] += cpu->V[(opcode & 0x00F0) >> 4];
+                  cpu->pc += 2;   
+                  break;
+
+                case 0x0005:
+                  // 0x8xy5
+                  // Vx = Vx - Vy, set VF = NOT borrow
+                  if (cpu->V[(opcode & 0x0F00) >> 8] > cpu->V[(opcode & 0x00F0) >> 4]) cpu->V[0xF] = 1;
+                  else cpu->V[0xF] = 0;
+                  cpu->V[(opcode & 0x0F00) >> 8] -= cpu->V[(opcode & 0x00F0) >> 4];
+                  cpu->pc += 2;
+                  break;
+
+                case 0x0006:
+                  // 0x8xy6
+                  // Vx = Vx SHR 1
+                  // If LSB == 1, then VF = 1, otherwise 0.  Vx /= 2
+                  cpu->V[0xF] = (cpu->V[(opcode & 0x0F00) >> 8]) & 0x1;
+                  cpu->V[(opcode & 0x0F00) >> 8] = cpu->V[(opcode & 0x0F00) >> 8] >> 2 ;
+                  cpu->pc += 2;
+                  break;
+
+                case 0x0007:
+                  // 0x8xy7
+                  // Vx = Vy - Vx, set VF = NOT borrow
+                  if (cpu->V[(opcode & 0x00F0) >> 4] > cpu->V[(opcode & 0x0F00) >> 8]) cpu->V[0xF] = 1;
+                  else cpu->V[0xF] = 0;
+                  cpu->V[(opcode & 0x0F00) >> 8] = cpu->V[(opcode & 0x00F0) >> 4] - cpu->V[(opcode & 0x0F00) >> 8];
+                  cpu->pc += 2;
+                  break;
+
+                case 0x000E:
+                  // 0x8xyE
+                  // Vx = Vx SHL 1
+                  cpu->V[0xF] = (cpu->V[(opcode & 0x0F00) >> 8] >> 15);
+                  cpu->V[(opcode & 0x0F00) >> 8] =  cpu->V[(opcode & 0x0F00) >> 8] << 2;
+                  cpu->pc += 2;
+                  break;
+
                 default:
                   printf("invalid command: [%0x]\n", opcode);
                   exit(EXIT_FAILURE);
               }
             break;
+
+          case 0x9000:
+            // 0x9xy0
+            // skip next instruction if Vx != Vy
+            if (cpu->V[(opcode & 0x0F00) >> 8] != cpu->V[(opcode & 0x00F0) >> 4]) cpu->pc += 4;
+            else cpu->pc +=2;
+            break;
+
+
 
           default:
             printf("invalid command: [%0x]\n", opcode);
