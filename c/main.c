@@ -30,9 +30,7 @@ int initialize_memory(unsigned char* memory, unsigned char* fontset, char* game_
     {
       memory[i] = fontset[i];
     }
-  printf("fontset loaded\n");
 
-  printf("%s\n", game_name);
   gamefp = fopen(game_name, "r");
 
   if (gamefp == NULL) {
@@ -53,24 +51,116 @@ int initialize_memory(unsigned char* memory, unsigned char* fontset, char* game_
       memory[i + 0x200] = temp;
     }
 
+  fclose(gamefp);
   return 0;
 }
 
 int emulate(CPU* cpu, unsigned char* memory, unsigned short* stack, unsigned char* key) {
 
   bool loop_game = true;
-  u_int8_t opcode;
+  u_int16_t opcode;
 
   while (loop_game)
     {
       // Fetch
-      opcode = memory[cpu->pc];
+      opcode = memory[cpu->pc] << 8 | memory[cpu->pc + 1];
 
       // Decode
-
-      switch (opcode)
+      // Use first 4 bits to determine action, last 12 to determine other stuff
+      switch (opcode & 0xF000)
         {
-            
+          case 0x0000:
+            switch (opcode & 0x0FFF)
+              {
+                case 0x0E0:
+                  // CLS
+                  cpu->pc += 2;
+                  break;
+
+                case 0x0EE:
+                  // RET
+                  cpu->pc += 2;
+                  break;
+
+                default:
+                  printf("invalid command: [%0x]\n", opcode);
+                  exit(EXIT_FAILURE);
+              }
+            break;
+
+          case 0x1000:
+            // JP addr
+            cpu->pc = opcode & 0x0FFF;
+            break;
+
+          case 0x2000:
+            // CALL addr
+            stack[cpu->sp] = cpu->pc;           // PUSH RET addr
+            cpu->sp++;                          // INC SP
+            cpu->pc = opcode & 0x0FFF;           // JMP addr
+            break;
+
+          case 0x3000:
+            // 0x3xkk
+            // Skip next instruction of Vx = kk
+            if (cpu->V[(opcode & 0x0F00) >> 8] == (opcode & 0x00FF)) cpu->pc += 4;
+            else cpu->pc += 2;
+            break;
+
+          case 0x4000:
+            // 0x4xkk
+            // Skip next instruction if Vx != kk
+            if (cpu->V[(opcode & 0x0F00) >> 8] != (opcode & 0x00FF)) cpu->pc += 4;
+            else cpu->pc += 2;
+            break;
+
+          case 0x5000:
+            // 0x5xy0
+            // Skip next instruction if Vx == Vy
+            if (cpu->V[(opcode & 0x0F00) >> 8] == cpu->V[(opcode & 0x00F0) >> 4]) cpu->pc += 4;
+            else cpu->pc += 2;
+            break;
+
+          case 0x6000:
+            // 0x6xkk
+            // puts value kk into register Vx
+            cpu->V[(opcode & 0x0F00) >> 8] = (opcode & 0x00FF);
+            cpu->pc += 2;
+            break;
+
+          case 0x7000:
+            // 0x7xkk
+            // Adds value kk to the value of register Vx, then store in Vx
+            cpu->V[(opcode & 0x0F00) >> 8] += (opcode & 0x00FF);
+            cpu->pc += 2;
+            break;
+
+          case 0x8000:
+            switch (opcode & 0x000F)
+              {
+                case 0x0000:
+                  // 0x8xy0
+                  // Vx = Vy
+                  cpu->V[(opcode & 0x0F00) >> 8] = cpu->V[(opcode & 0x00F0) >> 4];
+                  cpu->pc += 2;
+                  break;
+
+                case 0x0001:
+                  // 0x8xy1
+                  // Vx = Vx OR Vy
+                  cpu->V[(opcode & 0x0F00) >> 8] |= cpu->V[(opcode & 0x00F0) >> 4];
+                  cpu->pc += 2;
+                  break;
+
+                default:
+                  printf("invalid command: [%0x]\n", opcode);
+                  exit(EXIT_FAILURE);
+              }
+            break;
+
+          default:
+            printf("invalid command: [%0x]\n", opcode);
+            exit(EXIT_FAILURE);
         }
 
 
